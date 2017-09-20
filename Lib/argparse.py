@@ -112,10 +112,10 @@ PARSER = 'A...'
 REMAINDER = '...'
 _UNRECOGNIZED_ARGS_ATTR = '_unrecognized_args'
 
+
 # =============================
 # Utility functions and classes
 # =============================
-
 class _AttributeHolder(object):
     """Abstract base class that provides __repr__.
 
@@ -140,9 +140,11 @@ class _AttributeHolder(object):
             arg_strings.append('**%s' % repr(star_args))
         return '%s(%s)' % (type_name, ', '.join(arg_strings))
 
-    # TODO: Python4 - rename this to __str__()...
+    # TODO: Python4 - rename this to __str__() (and change else case)...
     def get_name(self):
-        """Return the name of the action - the argument(s) to which the action corresponds"""
+        """Return the name of the action - the argument(s) to which the action
+        corresponds.
+        """
         if self.option_strings:
             return  '/'.join(self.option_strings)
         elif self.metavar not in (None, SUPPRESS):
@@ -150,7 +152,7 @@ class _AttributeHolder(object):
         elif self.dest not in (None, SUPPRESS):
             return self.dest
         else:
-            return 'Uninitialised Action'
+            return None
 
     def _get_kwargs(self):
         return sorted(self.__dict__.items())
@@ -220,7 +222,6 @@ class HelpFormatter(object):
         self._level -= 1
 
     class _Section(object):
-
         def __init__(self, formatter, parent, heading=None):
             self.formatter = formatter
             self.parent = parent
@@ -717,6 +718,7 @@ class MetavarTypeHelpFormatter(HelpFormatter):
 # =====================
 
 # Helper for simplify handling argument is None.
+# TODO: Python4 - this is superflous; just use __str__()...
 def _get_action_name(argument):
     if argument is None:
         return None
@@ -1610,27 +1612,6 @@ class RaisingArgumentParser(_AttributeHolder, _ActionsContainer):
         - add_help -- Add a -h/-help option
         - allow_abbrev -- Allow long options to be abbreviated unambiguously
     """
-    pass
-
-
-class ExitingArgumentParser(_AttributeHolder, _ActionsContainer):
-    """Object for parsing command line strings into Python objects.
-
-    Keyword Arguments:
-        - prog -- The name of the program (default: sys.argv[0])
-        - usage -- A usage message (default: auto-generated from arguments)
-        - description -- A description of what the program does
-        - epilog -- Text following the argument descriptions
-        - parents -- Parsers whose arguments should be copied into this one
-        - formatter_class -- HelpFormatter class for printing help messages
-        - prefix_chars -- Characters that prefix optional arguments
-        - fromfile_prefix_chars -- Characters that prefix files containing
-            additional arguments
-        - argument_default -- The default value for all arguments
-        - conflict_handler -- String indicating how to handle conflicts
-        - add_help -- Add a -h/-help option
-        - allow_abbrev -- Allow long options to be abbreviated unambiguously
-    """
 
     def __init__(self,
                  prog=None,
@@ -1763,8 +1744,10 @@ class ExitingArgumentParser(_AttributeHolder, _ActionsContainer):
     def parse_args(self, args=None, namespace=None):
         args, argv = self.parse_known_args(args, namespace)
         if argv:
-            msg = _('unrecognized arguments: %s')
-            self.error(msg % ' '.join(argv))
+            raise ArgumentError(
+                None,
+                _('unrecognized arguments: %s') % ' '.join(argv)
+            )
         return args
 
     def parse_known_args(self, args=None, namespace=None):
@@ -1792,15 +1775,11 @@ class ExitingArgumentParser(_AttributeHolder, _ActionsContainer):
                 setattr(namespace, dest, self._defaults[dest])
 
         # parse the arguments and exit if there are any errors
-        try:
-            namespace, args = self._parse_known_args(args, namespace)
-            if hasattr(namespace, _UNRECOGNIZED_ARGS_ATTR):
-                args.extend(getattr(namespace, _UNRECOGNIZED_ARGS_ATTR))
-                delattr(namespace, _UNRECOGNIZED_ARGS_ATTR)
-            return namespace, args
-        except ArgumentError:
-            err = _sys.exc_info()[1]
-            self.error(str(err))
+        namespace, args = self._parse_known_args(args, namespace)
+        if hasattr(namespace, _UNRECOGNIZED_ARGS_ATTR):
+            args.extend(getattr(namespace, _UNRECOGNIZED_ARGS_ATTR))
+            delattr(namespace, _UNRECOGNIZED_ARGS_ATTR)
+        return namespace, args
 
     def _parse_known_args(self, arg_strings, namespace):
         # replace arg strings that are file references
@@ -1824,13 +1803,11 @@ class ExitingArgumentParser(_AttributeHolder, _ActionsContainer):
         arg_string_pattern_parts = []
         arg_strings_iter = iter(arg_strings)
         for i, arg_string in enumerate(arg_strings_iter):
-
             # all args after -- are non-options
             if arg_string == '--':
                 arg_string_pattern_parts.append('-')
                 for arg_string in arg_strings_iter:
                     arg_string_pattern_parts.append('A')
-
             # otherwise, add the arg to the arg strings
             # and note the index if it was an option
             else:
@@ -1871,7 +1848,6 @@ class ExitingArgumentParser(_AttributeHolder, _ActionsContainer):
 
         # function to convert arg_strings into an optional action
         def consume_optional(start_index):
-
             # get the optional identified at this index
             option_tuple = option_string_indices[start_index]
             action, option_string, explicit_arg = option_tuple
@@ -1881,7 +1857,6 @@ class ExitingArgumentParser(_AttributeHolder, _ActionsContainer):
             match_argument = self._match_argument
             action_tuples = []
             while True:
-
                 # if we found no optional action, skip it
                 if action is None:
                     extras.append(arg_strings[start_index])
@@ -1908,7 +1883,6 @@ class ExitingArgumentParser(_AttributeHolder, _ActionsContainer):
                         else:
                             msg = _('ignored explicit argument %r')
                             raise ArgumentError(action, msg % explicit_arg)
-
                     # if the action expect exactly one argument, we've
                     # successfully matched the option; exit the loop
                     elif arg_count == 1:
@@ -1916,13 +1890,11 @@ class ExitingArgumentParser(_AttributeHolder, _ActionsContainer):
                         args = [explicit_arg]
                         action_tuples.append((action, args, option_string))
                         break
-
                     # error if a double-dash option did not use the
                     # explicit argument
                     else:
                         msg = _('ignored explicit argument %r')
                         raise ArgumentError(action, msg % explicit_arg)
-
                 # if there is no explicit argument, try to match the
                 # optional's string arguments with the following strings
                 # if successful, exit the loop
@@ -1974,7 +1946,6 @@ class ExitingArgumentParser(_AttributeHolder, _ActionsContainer):
         else:
             max_option_string_index = -1
         while start_index <= max_option_string_index:
-
             # consume any Positionals preceding the next option
             next_option_string_index = min([
                 index
@@ -2036,7 +2007,6 @@ class ExitingArgumentParser(_AttributeHolder, _ActionsContainer):
                 for action in group._group_actions:
                     if action in seen_non_default_actions:
                         break
-
                 # if no actions were used, report the error
                 else:
                     names = [_get_action_name(action)
@@ -2052,25 +2022,18 @@ class ExitingArgumentParser(_AttributeHolder, _ActionsContainer):
         # expand arguments referencing files
         new_arg_strings = []
         for arg_string in arg_strings:
-
             # for regular arguments, just add them back into the list
             if not arg_string or arg_string[0] not in self.fromfile_prefix_chars:
                 new_arg_strings.append(arg_string)
-
             # replace arguments referencing files with the file content
             else:
-                try:
-                    with open(arg_string[1:]) as args_file:
-                        arg_strings = []
-                        for arg_line in args_file.read().splitlines():
-                            for arg in self.convert_arg_line_to_args(arg_line):
-                                arg_strings.append(arg)
-                        arg_strings = self._read_args_from_files(arg_strings)
-                        new_arg_strings.extend(arg_strings)
-                except OSError:
-                    err = _sys.exc_info()[1]
-                    self.error(str(err))
-
+                with open(arg_string[1:]) as args_file:
+                    arg_strings = []
+                    for arg_line in args_file.read().splitlines():
+                        for arg in self.convert_arg_line_to_args(arg_line):
+                            arg_strings.append(arg)
+                    arg_strings = self._read_args_from_files(arg_strings)
+                    new_arg_strings.extend(arg_strings)
         # return the modified argument list
         return new_arg_strings
 
@@ -2094,7 +2057,6 @@ class ExitingArgumentParser(_AttributeHolder, _ActionsContainer):
                                action.nargs) % action.nargs
             msg = nargs_errors.get(action.nargs, default)
             raise ArgumentError(action, msg)
-
         # return the number of arguments matched
         return len(match.group(1))
 
@@ -2110,7 +2072,6 @@ class ExitingArgumentParser(_AttributeHolder, _ActionsContainer):
             if match is not None:
                 result.extend([len(string) for string in match.groups()])
                 break
-
         # return the list of arg string counts
         return result
 
@@ -2434,21 +2395,17 @@ class ExitingArgumentParser(_AttributeHolder, _ActionsContainer):
 
     def format_help(self):
         formatter = self._get_formatter()
-
         # usage
         formatter.add_usage(self.usage, self._actions,
                             self._mutually_exclusive_groups)
-
         # description
         formatter.add_text(self.description)
-
         # positionals, optionals and user-defined groups
         for action_group in self._action_groups:
             formatter.start_section(action_group.title)
             formatter.add_text(action_group.description)
             formatter.add_arguments(action_group._group_actions)
             formatter.end_section()
-
         # epilog
         formatter.add_text(self.epilog)
         # determine help from format above
@@ -2476,9 +2433,52 @@ class ExitingArgumentParser(_AttributeHolder, _ActionsContainer):
                 file = _sys.stderr
             file.write(message)
 
-    # ===============
-    # Exiting methods
-    # ===============
+    def error(self, message):
+        """error(message: string)
+
+        Raises an exception.
+
+        If you override this in a subclass, it should not return -- it
+        should either exit or raise an exception.
+        """
+        raise Exception(message)
+
+
+class ExitingArgumentParser(RaisingArgumentParser):
+    """Object for parsing command line strings into Python objects.
+
+    Keyword Arguments:
+        - prog -- The name of the program (default: sys.argv[0])
+        - usage -- A usage message (default: auto-generated from arguments)
+        - description -- A description of what the program does
+        - epilog -- Text following the argument descriptions
+        - parents -- Parsers whose arguments should be copied into this one
+        - formatter_class -- HelpFormatter class for printing help messages
+        - prefix_chars -- Characters that prefix optional arguments
+        - fromfile_prefix_chars -- Characters that prefix files containing
+            additional arguments
+        - argument_default -- The default value for all arguments
+        - conflict_handler -- String indicating how to handle conflicts
+        - add_help -- Add a -h/-help option
+        - allow_abbrev -- Allow long options to be abbreviated unambiguously
+    """
+
+    def parse_args(self, args=None, namespace=None):
+        """Attempt to parse the provided argument list and exit if an error occurs."""
+        try:
+            return super().parse_args(args, namespace)
+        except ArgumentError as e:
+            self.error(str(e))
+
+    def parse_known_args(self, args=None, namespace=None):
+        """Attempt to parse only the known arguments from the list and exit if an
+        error occurs.
+        """
+        try:
+            return super().parse_known_args(args, namespace)
+        except (ArgumentError, OSError) as e:
+            self.error(str(e))
+
     def exit(self, status=0, message=None):
         if message:
             self._print_message(message, _sys.stderr)
