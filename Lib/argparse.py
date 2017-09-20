@@ -1,4 +1,5 @@
 # Author: Steven J. Bethard <steven.bethard@gmail.com>.
+# Modified: Edward Cullen <edward.cullen@custardsoft.co.uk>.
 
 """Command-line parsing library
 
@@ -31,10 +32,17 @@ The module contains the following public classes:
         the parse_args() method is invoked to convert the args at the
         command-line into an object with attributes.
 
+    - ExitingArgumentParser -- This is the default implementation which will
+        call sys.exit() when an error is encountered.
+
+    - RaisingArugmentParser -- An alternative implementation which will simply
+        raise an exception when an error is encountered.
+        TODO: Python4 - make this the default.
+
     - ArgumentError -- The exception raised by ArgumentParser objects when
         there are errors with the parser's actions. Errors raised while
-        parsing the command-line are caught by ArgumentParser and emitted
-        as command-line messages.
+        parsing the command-line are caught by ExitingArgumentParser and
+        emitted as command-line messages.
 
     - FileType -- A factory for defining types of files to be created. As the
         example above shows, instances of FileType are typically passed as
@@ -61,9 +69,11 @@ considered public as object names -- the API of the formatter objects is
 still considered an implementation detail.)
 """
 
-__version__ = '1.1'
+__version__ = '1.2'
 __all__ = [
     'ArgumentParser',
+    'RaisingArgumentParser',
+    'ExitingArgumentParser',
     'ArgumentError',
     'ArgumentTypeError',
     'FileType',
@@ -129,6 +139,18 @@ class _AttributeHolder(object):
         if star_args:
             arg_strings.append('**%s' % repr(star_args))
         return '%s(%s)' % (type_name, ', '.join(arg_strings))
+
+    # TODO: Python4 - rename this to __str__()...
+    def get_name(self):
+        """Return the name of the action - the argument(s) to which the action corresponds"""
+        if self.option_strings:
+            return  '/'.join(self.option_strings)
+        elif self.metavar not in (None, SUPPRESS):
+            return self.metavar
+        elif self.dest not in (None, SUPPRESS):
+            return self.dest
+        else:
+            return 'Uninitialised Action'
 
     def _get_kwargs(self):
         return sorted(self.__dict__.items())
@@ -570,7 +592,7 @@ class HelpFormatter(object):
             if isinstance(result, tuple):
                 return result
             else:
-                return (result, ) * tuple_size
+                return (result,) * tuple_size
         return format
 
     def _format_args(self, action, default_metavar):
@@ -690,22 +712,15 @@ class MetavarTypeHelpFormatter(HelpFormatter):
         return action.type.__name__
 
 
-
 # =====================
 # Options and Arguments
 # =====================
 
+# Helper for simplify handling argument is None.
 def _get_action_name(argument):
     if argument is None:
         return None
-    elif argument.option_strings:
-        return  '/'.join(argument.option_strings)
-    elif argument.metavar not in (None, SUPPRESS):
-        return argument.metavar
-    elif argument.dest not in (None, SUPPRESS):
-        return argument.dest
-    else:
-        return None
+    return argument.get_name()
 
 
 class ArgumentError(Exception):
@@ -847,7 +862,7 @@ class _StoreAction(Action):
                              'true or store const may be more appropriate')
         if const is not None and nargs != OPTIONAL:
             raise ValueError('nargs must be %r to supply const' % OPTIONAL)
-        super(_StoreAction, self).__init__(
+        super().__init__(
             option_strings=option_strings,
             dest=dest,
             nargs=nargs,
@@ -873,7 +888,7 @@ class _StoreConstAction(Action):
                  required=False,
                  help=None,
                  metavar=None):
-        super(_StoreConstAction, self).__init__(
+        super().__init__(
             option_strings=option_strings,
             dest=dest,
             nargs=0,
@@ -894,7 +909,7 @@ class _StoreTrueAction(_StoreConstAction):
                  default=False,
                  required=False,
                  help=None):
-        super(_StoreTrueAction, self).__init__(
+        super().__init__(
             option_strings=option_strings,
             dest=dest,
             const=True,
@@ -911,7 +926,7 @@ class _StoreFalseAction(_StoreConstAction):
                  default=True,
                  required=False,
                  help=None):
-        super(_StoreFalseAction, self).__init__(
+        super().__init__(
             option_strings=option_strings,
             dest=dest,
             const=False,
@@ -939,7 +954,7 @@ class _AppendAction(Action):
                              'the append const action may be more appropriate')
         if const is not None and nargs != OPTIONAL:
             raise ValueError('nargs must be %r to supply const' % OPTIONAL)
-        super(_AppendAction, self).__init__(
+        super().__init__(
             option_strings=option_strings,
             dest=dest,
             nargs=nargs,
@@ -967,7 +982,7 @@ class _AppendConstAction(Action):
                  required=False,
                  help=None,
                  metavar=None):
-        super(_AppendConstAction, self).__init__(
+        super().__init__(
             option_strings=option_strings,
             dest=dest,
             nargs=0,
@@ -991,7 +1006,7 @@ class _CountAction(Action):
                  default=None,
                  required=False,
                  help=None):
-        super(_CountAction, self).__init__(
+        super().__init__(
             option_strings=option_strings,
             dest=dest,
             nargs=0,
@@ -1011,7 +1026,7 @@ class _HelpAction(Action):
                  dest=SUPPRESS,
                  default=SUPPRESS,
                  help=None):
-        super(_HelpAction, self).__init__(
+        super().__init__(
             option_strings=option_strings,
             dest=dest,
             default=default,
@@ -1031,7 +1046,7 @@ class _VersionAction(Action):
                  dest=SUPPRESS,
                  default=SUPPRESS,
                  help="show program's version number and exit"):
-        super(_VersionAction, self).__init__(
+        super().__init__(
             option_strings=option_strings,
             dest=dest,
             default=default,
@@ -1074,7 +1089,7 @@ class _SubParsersAction(Action):
         self._name_parser_map = _collections.OrderedDict()
         self._choices_actions = []
 
-        super(_SubParsersAction, self).__init__(
+        super().__init__(
             option_strings=option_strings,
             dest=dest,
             nargs=PARSER,
@@ -1226,7 +1241,7 @@ class _ActionsContainer(object):
                  prefix_chars,
                  argument_default,
                  conflict_handler):
-        super(_ActionsContainer, self).__init__()
+        super().__init__()
 
         self.description = description
         self.argument_default = argument_default
@@ -1297,7 +1312,6 @@ class _ActionsContainer(object):
             if action.dest == dest and action.default is not None:
                 return action.default
         return self._defaults.get(dest, None)
-
 
     # =======================
     # Adding argument actions
@@ -1395,7 +1409,6 @@ class _ActionsContainer(object):
         # map each action to its group
         group_map = {}
         for group in container._action_groups:
-
             # if a group with the title exists, use that, otherwise
             # create a new group matching the container's group
             if group.title not in title_group_map:
@@ -1515,7 +1528,6 @@ class _ActionsContainer(object):
 
         # remove all conflicting options
         for option_string, action in conflicting_actions:
-
             # remove the conflicting option
             action.option_strings.remove(option_string)
             self._option_string_actions.pop(option_string, None)
@@ -1534,7 +1546,7 @@ class _ArgumentGroup(_ActionsContainer):
         update('conflict_handler', container.conflict_handler)
         update('prefix_chars', container.prefix_chars)
         update('argument_default', container.argument_default)
-        super_init = super(_ArgumentGroup, self).__init__
+        super_init = super().__init__
         super_init(description=description, **kwargs)
 
         # group attributes
@@ -1551,19 +1563,19 @@ class _ArgumentGroup(_ActionsContainer):
         self._mutually_exclusive_groups = container._mutually_exclusive_groups
 
     def _add_action(self, action):
-        action = super(_ArgumentGroup, self)._add_action(action)
+        action = super()._add_action(action)
         self._group_actions.append(action)
         return action
 
     def _remove_action(self, action):
-        super(_ArgumentGroup, self)._remove_action(action)
+        super()._remove_action(action)
         self._group_actions.remove(action)
 
 
 class _MutuallyExclusiveGroup(_ArgumentGroup):
 
     def __init__(self, container, required=False):
-        super(_MutuallyExclusiveGroup, self).__init__(container)
+        super().__init__(container)
         self.required = required
         self._container = container
 
@@ -1580,7 +1592,28 @@ class _MutuallyExclusiveGroup(_ArgumentGroup):
         self._group_actions.remove(action)
 
 
-class ArgumentParser(_AttributeHolder, _ActionsContainer):
+class RaisingArgumentParser(_AttributeHolder, _ActionsContainer):
+    """Object for parsing command line strings into Python objects.
+
+    Keyword Arguments:
+        - prog -- The name of the program (default: sys.argv[0])
+        - usage -- A usage message (default: auto-generated from arguments)
+        - description -- A description of what the program does
+        - epilog -- Text following the argument descriptions
+        - parents -- Parsers whose arguments should be copied into this one
+        - formatter_class -- HelpFormatter class for printing help messages
+        - prefix_chars -- Characters that prefix optional arguments
+        - fromfile_prefix_chars -- Characters that prefix files containing
+            additional arguments
+        - argument_default -- The default value for all arguments
+        - conflict_handler -- String indicating how to handle conflicts
+        - add_help -- Add a -h/-help option
+        - allow_abbrev -- Allow long options to be abbreviated unambiguously
+    """
+    pass
+
+
+class ExitingArgumentParser(_AttributeHolder, _ActionsContainer):
     """Object for parsing command line strings into Python objects.
 
     Keyword Arguments:
@@ -1613,11 +1646,10 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
                  add_help=True,
                  allow_abbrev=True):
 
-        superinit = super(ArgumentParser, self).__init__
-        superinit(description=description,
-                  prefix_chars=prefix_chars,
-                  argument_default=argument_default,
-                  conflict_handler=conflict_handler)
+        super().__init__(description=description,
+                         prefix_chars=prefix_chars,
+                         argument_default=argument_default,
+                         conflict_handler=conflict_handler)
 
         # default setting for prog
         if prog is None:
@@ -1646,7 +1678,7 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
         default_prefix = '-' if '-' in prefix_chars else prefix_chars[0]
         if self.add_help:
             self.add_argument(
-                default_prefix+'h', default_prefix*2+'help',
+                default_prefix + 'h', default_prefix * 2 + 'help',
                 action='help', default=SUPPRESS,
                 help=_('show this help message and exit'))
 
@@ -2177,9 +2209,8 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
                     action = self._option_string_actions[option_string]
                     tup = action, option_string, explicit_arg
                     result.append(tup)
-
-        # shouldn't ever get here
         else:
+            # shouldn't ever get here
             self.error(_('unexpected option string: %s') % option_string)
 
         # return the collected option tuples
@@ -2193,31 +2224,24 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
         # the default (None) is assumed to be a single argument
         if nargs is None:
             nargs_pattern = '(-*A-*)'
-
         # allow zero or one arguments
         elif nargs == OPTIONAL:
             nargs_pattern = '(-*A?-*)'
-
         # allow zero or more arguments
         elif nargs == ZERO_OR_MORE:
             nargs_pattern = '(-*[A-]*)'
-
         # allow one or more arguments
         elif nargs == ONE_OR_MORE:
             nargs_pattern = '(-*A[A-]*)'
-
         # allow any number of options or arguments
         elif nargs == REMAINDER:
             nargs_pattern = '([-AO]*)'
-
         # allow one argument followed by any number of options or arguments
         elif nargs == PARSER:
             nargs_pattern = '(-*A[-AO]*)'
-
         # suppress action, like nargs=0
         elif nargs == SUPPRESS:
             nargs_pattern = '(-*-*)'
-
         # all others should be integers
         else:
             nargs_pattern = '(-*%s-*)' % '-*'.join('A' * nargs)
@@ -2259,7 +2283,7 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
              if action.nargs in [PARSER, REMAINDER]]
         if a:
             raise TypeError('parse_intermixed_args: positional arg'
-                            ' with nargs=%s'%a[0].nargs)
+                            ' with nargs=%s' % a[0].nargs)
 
         if [action.dest for group in self._mutually_exclusive_groups
             for action in group._group_actions if action in positionals]:
@@ -2284,7 +2308,7 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
                 for action in positionals:
                     # remove the empty positional values from namespace
                     if (hasattr(namespace, action.dest)
-                            and getattr(namespace, action.dest)==[]):
+                            and getattr(namespace, action.dest) == []):
                         from warnings import warn
                         warn('Do not expect %s in %s' % (action.dest, namespace))
                         delattr(namespace, action.dest)
@@ -2335,7 +2359,6 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
             if isinstance(value, str):
                 value = self._get_value(action, value)
                 self._check_value(action, value)
-
         # when nargs='*' on a positional, if there were no command-line
         # args, use the default if it is anything other than None
         elif (not arg_strings and action.nargs == ZERO_OR_MORE and
@@ -2345,26 +2368,21 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
             else:
                 value = arg_strings
             self._check_value(action, value)
-
         # single argument or optional argument produces a single value
         elif len(arg_strings) == 1 and action.nargs in [None, OPTIONAL]:
             arg_string, = arg_strings
             value = self._get_value(action, arg_string)
             self._check_value(action, value)
-
         # REMAINDER arguments convert all values, checking none
         elif action.nargs == REMAINDER:
             value = [self._get_value(action, v) for v in arg_strings]
-
         # PARSER arguments convert all values, but check only the first
         elif action.nargs == PARSER:
             value = [self._get_value(action, v) for v in arg_strings]
             self._check_value(action, value[0])
-
         # SUPPRESS argument does not put anything in the namespace
         elif action.nargs == SUPPRESS:
             value = SUPPRESS
-
         # all other types of nargs produce a list
         else:
             value = [self._get_value(action, v) for v in arg_strings]
@@ -2383,20 +2401,17 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
         # convert the value to the appropriate type
         try:
             result = type_func(arg_string)
-
         # ArgumentTypeErrors indicate errors
         except ArgumentTypeError:
             name = getattr(action.type, '__name__', repr(action.type))
             msg = str(_sys.exc_info()[1])
             raise ArgumentError(action, msg)
-
         # TypeErrors or ValueErrors also indicate errors
         except (TypeError, ValueError):
             name = getattr(action.type, '__name__', repr(action.type))
             args = {'type': name, 'value': arg_string}
             msg = _('invalid %(type)s value: %(value)r')
             raise ArgumentError(action, msg % args)
-
         # return the converted value
         return result
 
@@ -2436,7 +2451,6 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
 
         # epilog
         formatter.add_text(self.epilog)
-
         # determine help from format above
         return formatter.format_help()
 
@@ -2482,3 +2496,9 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
         self.print_usage(_sys.stderr)
         args = {'prog': self.prog, 'message': message}
         self.exit(2, _('%(prog)s: error: %(message)s\n') % args)
+
+
+# Alias for compatibility.
+# TODO: Python4 - remove this alias and rename RaisingAP to simply ArgumentParser
+class ArgumentParser(ExitingArgumentParser):
+    pass
